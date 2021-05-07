@@ -1,0 +1,278 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from pandas.plotting import scatter_matrix
+from binance.client import Client
+import seaborn as sns
+import statsmodels.formula.api as smf
+
+
+api_key = 
+api_secret = 
+
+client = Client(api_key, api_secret)
+
+crypto1 = 'BTCUSDT'
+crypto2 = 'ETHUSDT'
+crypto3 = 'UNIUSDT'
+crypto4 = 'LINKUSDT'
+crypto5 = 'MKRUSDT'
+crypto6 = 'AAVEUSDT'
+crypto7 = 'SNXUSDT'
+crypto8 = 'COMPUSDT'
+crypto9 = 'YFIUSDT'
+crypto10 ='SUSHIUSDT'
+#crypto8 = 'USDT'
+
+def createDataFrame(cryptoticker):
+    klines = client.get_historical_klines(cryptoticker, Client.KLINE_INTERVAL_1DAY, "60 days ago UTC")
+    dataframe = pd.DataFrame(klines, columns=['open_time','open', 'high', 'low', 'close', 'volume',
+                                              'close_time', 'qav', 'num_trades', 'taker_base_vol',
+                                              'taker_quote_vol','is_best_match'])
+    unnecessaryColumns = ['open_time', 'open', 'high', 'low', 'volume','close_time','qav', 'num_trades',
+                          'taker_base_vol','taker_quote_vol','is_best_match']
+    for columnName in unnecessaryColumns:
+        del dataframe[columnName]
+    dataframe.columns = [cryptoticker]
+    dataframe[cryptoticker] = (dataframe[cryptoticker].astype(float)).diff()
+    dataframe = dataframe[1:]
+    return dataframe
+
+
+def createPriceFrame(crypto):
+    klines = client.get_historical_klines(crypto, Client.KLINE_INTERVAL_1DAY, "60 days ago UTC")
+    dataframe = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume',
+                                              'close_time', 'qav', 'num_trades', 'taker_base_vol',
+                                              'taker_quote_vol', 'is_best_match'])
+    unnecessaryColumns = ['open_time', 'open', 'high', 'low', 'volume', 'close_time', 'qav', 'num_trades',
+                          'taker_base_vol', 'taker_quote_vol', 'is_best_match']
+    for columnName in unnecessaryColumns:
+        del dataframe[columnName]
+    dataframe.columns = [crypto]
+    dataframe[crypto] = dataframe[crypto].astype(float)
+    return dataframe
+
+
+def createReturnsFrame(cryp):
+    klines = client.get_historical_klines(cryp, Client.KLINE_INTERVAL_1DAY, "60 days ago UTC")
+    dataframe = pd.DataFrame(klines, columns=['open_time','open', 'high', 'low', 'close', 'volume',
+                                              'close_time', 'qav', 'num_trades', 'taker_base_vol',
+                                              'taker_quote_vol','is_best_match'])
+    unnecessaryColumns = ['open_time', 'open', 'high', 'low', 'volume','close_time','qav', 'num_trades',
+                          'taker_base_vol','taker_quote_vol','is_best_match']
+    for columnName in unnecessaryColumns:
+        del dataframe[columnName]
+    dataframe.columns = [cryp]
+    dataframe = (dataframe.astype(float))
+    returnedDf = pd.DataFrame()
+    dataframe[cryp] = ((dataframe[cryp] - dataframe[cryp].iat[0])/dataframe[cryp].iat[0])*100
+    #print(dataframe)
+    return dataframe
+
+crypto1data = createDataFrame(crypto1)
+crypto2data = createDataFrame(crypto2)
+crypto3data = createDataFrame(crypto3)
+crypto4data = createDataFrame(crypto4)
+crypto5data = createDataFrame(crypto5)
+crypto6data = createDataFrame(crypto6)
+crypto7data = createDataFrame(crypto7)
+crypto8data = createDataFrame(crypto8)
+crypto9data = createDataFrame(crypto9)
+crypto10data = createDataFrame(crypto10)
+
+returns1 = createReturnsFrame(crypto1)
+returns2 = createReturnsFrame(crypto2)
+returns3 = createReturnsFrame(crypto3)
+returns4 = createReturnsFrame(crypto4)
+returns5 = createReturnsFrame(crypto5)
+returns6 = createReturnsFrame(crypto6)
+returns7 = createReturnsFrame(crypto7)
+returns8 = createReturnsFrame(crypto8)
+returns9 = createReturnsFrame(crypto9)
+returns10 = createReturnsFrame(crypto10)
+
+MasterFrame = pd.concat([crypto1data, crypto2data, crypto3data, crypto4data, crypto5data, crypto6data, crypto7data, crypto8data, crypto9data, crypto10data], axis=1)
+ReturnsFrame = pd.concat([returns1, returns2, returns3, returns4, returns5, returns6, returns7, returns8, returns9, returns10], axis=1)
+
+# Data Splitting into train and test data
+TrainData = MasterFrame.iloc[0:29, :]
+TestData = MasterFrame.iloc[30:60, :]
+TrainDataReturns = ReturnsFrame.iloc[0:29,:]
+print(TrainData.head())
+
+#Heatmap of correlation in price action corr in training data
+TrainDataCorr = TrainData.corr()
+plt.figure()
+sns.heatmap(TrainDataCorr, annot=True, square=True, cmap='RdYlGn', vmin=-1, vmax=1)
+plt.title('Correlation of daily price action in training data', fontsize=20)
+
+#pair plot of training data
+plt.figure()
+scatter_matrix(TrainData)
+
+#chart of returns in train data
+plt.figure()
+TrainDataReturns.plot(title='Percentage Returns')
+
+#Heatmap of correlation in total returns in training data
+TrainDataReturnsCorr = TrainDataReturns.corr()
+plt.figure()
+sns.heatmap(TrainDataReturnsCorr, annot=True, square=True, cmap='RdYlGn', vmin=-1, vmax=1)
+plt.title('Correlation of total returns in training data', fontsize=20)
+
+
+
+
+
+#move uni's price tomorrow to today
+MasterFrame['UNI_AHEAD'] = MasterFrame['UNIUSDT'].shift(-1)
+uni_ahead_frame = MasterFrame.iloc[0:29, :]
+uni_ahead_frame.dropna()
+uni_ahead_heatmap = uni_ahead_frame.corr()
+#
+# #correlation between uni's price tomorrow and everything else today
+# plt.figure()
+# sns.heatmap(uni_ahead_heatmap, annot=True, square=True, cmap='RdYlGn', vmin=-1, vmax=1)
+# plt.title('heatmap with uni ahead')
+
+#Using linear regression model to correlate uni's price tomorrow to the price of everything today
+formula ='UNI_AHEAD~BTCUSDT+ETHUSDT+LINKUSDT+MKRUSDT+AAVEUSDT+SNXUSDT+COMPUSDT+YFIUSDT+SUSHIUSDT'
+lm = smf.ols(formula=formula, data=uni_ahead_frame).fit()
+print(lm.summary())
+predicted = lm.predict(uni_ahead_frame)
+uni_train_data = uni_ahead_frame['UNI_AHEAD']
+trainvspredictframe = pd.concat([predicted, uni_train_data], axis=1)
+print(trainvspredictframe)
+
+#chart of prediction for uni's price tomorrow vs it's actual price tomorrow
+plt.figure()
+trainvspredictframe.plot(title='Predicted price vs. Actual price of $UNI for training data')
+
+
+
+
+### testing on test data
+test_frame = MasterFrame.iloc[30:60, :]
+test_frame.dropna()
+#lm2 = smf.ols(formula=formula, data=test_frame).fit()
+predicted_test = lm.predict(test_frame)
+uni_test_data = test_frame['UNI_AHEAD']
+testvspredictframe = pd.concat([predicted_test, uni_test_data], axis=1)
+print(testvspredictframe)
+plt.figure()
+testvspredictframe.plot(title='Predicted price vs. Actual price of $UNI for testing data')
+
+
+
+
+
+#Charting returns of strategy when you buy or sell according to inflection points in the model
+BuyORSell = pd.DataFrame(columns=['decision', 'price', 'change', 'amount of uni', 'total'])
+UNIprice = createPriceFrame('UNIUSDT')
+BuyORSell['price'] = UNIprice['UNIUSDT'].astype(float)
+mergedData = pd.DataFrame(columns=['data'])
+mergedData['data'] = pd.concat([trainvspredictframe[0], testvspredictframe[0]])
+
+#mergedData.reset_index()
+print(mergedData)
+#pull tomorrow's predicted price
+BuyORSell['change'] = mergedData['data'].astype(float) #  uni_ahead_frame['UNI_AHEAD'].astype(float) for ideal
+BuyORSell = BuyORSell[1:]
+print(BuyORSell)
+
+
+#set the values of the first row so everything works
+uni_position_size = 1
+BuyORSell._set_value(1, 'amount of uni', uni_position_size)
+BuyORSell._set_value(2, 'amount of uni', uni_position_size)
+BuyORSell['amount of uni'] = BuyORSell['amount of uni'].astype(float)
+BuyORSell._set_value(1, 'total', float(BuyORSell['amount of uni'][1])*float(BuyORSell['price'][1]))
+BuyORSell.dropna()
+#BuyORSell = BuyORSell[BuyORSell['change'] != 'nan']
+BuyORSell = BuyORSell.drop([30], axis=0)
+BuyORSell = BuyORSell.reset_index()
+#BuyORSell = BuyORSell.reset_index()
+del BuyORSell['index']
+
+### strategy
+global last_decision
+last_decision = ''
+for change in BuyORSell['change']:
+    #if positive change predicted tomorrow
+    if change > 0:
+        index = BuyORSell[BuyORSell['change'] == change].index #find current index
+        BuyORSell._set_value(index, 'decision', 'BUY') #decide to buy today
+        newIndex = index + 1
+        oldIndex = index - 1
+
+        if (index != 57) and (index != 0): #exclude the first and last indice so the code doesn't mess up
+            BuyORSell['total'][index] = float(BuyORSell['total'][oldIndex]) #pull position value and the position size from the previous day
+            BuyORSell['amount of uni'][index] = float(BuyORSell['amount of uni'][oldIndex])
+
+            if last_decision == 'BUY': #if previous decision was a buy, recalculate current position value
+                BuyORSell['total'][index] = float(BuyORSell['amount of uni'][index])*float(BuyORSell['price'][index])
+
+            if last_decision != 'BUY:': #if last decision was not buy, execute a buy
+                oldIndex = index - 1
+                newIndex = index + 1
+                BuyORSell['amount of uni'][index] = float(BuyORSell['total'][index])/float(BuyORSell['price'][index])
+                last_decision = 'BUY'
+                BuyORSell['amount of uni'][newIndex] = float(BuyORSell['total'][index])/float(BuyORSell['price'][index])
+
+    elif change < 0: #if tomorrow's change is predicted to be negative
+        index = BuyORSell[BuyORSell['change'] == change].index
+        BuyORSell._set_value(index, 'decision', 'SELL')
+        newIndex = index + 1
+        oldIndex = index - 1
+
+        if (index != 57) and (index != 0):
+            BuyORSell['total'][index] = float(BuyORSell['total'][oldIndex])
+            BuyORSell['amount of uni'][index] = float(BuyORSell['amount of uni'][oldIndex])
+
+            if last_decision != 'SELL': #exectue a sell
+                newIndex = index + 1
+                oldIndex = index - 1
+                BuyORSell['total'][index] = float(BuyORSell['amount of uni'][index]) * float(BuyORSell['price'][index])
+                BuyORSell['amount of uni'][index] = 0
+                last_decision = 'SELL'
+
+
+
+BuyORSell.dropna()
+print(BuyORSell)
+
+# chart of returns from strategy vs price
+plt.figure()
+BuyORSell['total'].plot(label='Returns', legend=True)
+BuyORSell['price'].plot(label='Price', legend=True)
+plt.axvline(x=30, linestyle='--', color='k')
+plt.title('Price vs Strategy Performance')
+
+
+#test data 30 days
+
+testPlot = BuyORSell.iloc[30::]
+print(testPlot)
+
+testPlot['price'] =  ((testPlot['price']-testPlot['price'].iat[0])/testPlot['price'].iat[0])*100
+testPlot['total'] =  ((testPlot['total']-testPlot['total'].iat[0])/testPlot['total'].iat[0])*100
+print(testPlot)
+plt.figure()
+testPlot['price'].plot(label='Buy and Hold', legend=True)
+testPlot['total'].plot(label='Signal-based Strategy', legend=True)
+plt.title('Returns of trading strategy vs. Buy and Hold for test data')
+
+
+#train data 30 days
+
+trainPlot = BuyORSell.iloc[0:30:]
+print(testPlot)
+
+trainPlot['price'] = ((trainPlot['price']-trainPlot['price'].iat[0])/trainPlot['price'].iat[0])*100
+trainPlot['total'] = ((trainPlot['total']-trainPlot['total'].iat[0])/trainPlot['total'].iat[0])*100
+print(trainPlot)
+plt.figure()
+trainPlot['price'].plot(label='Buy and Hold', legend=True)
+trainPlot['total'].plot(label='Signal-based Strategy', legend=True)
+plt.title('Returns of trading strategy vs. Buy and Hold for train data')
+plt.show()
